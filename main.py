@@ -32,6 +32,14 @@ def split_image(image_path, m, n, output_dir):
     # 输出的正方形边长取子图片尺寸中较大者的向上取整
     square_size = math.ceil(max(sub_img_width, sub_img_height))
 
+    # 计算能容纳居中图像的总画布尺寸
+    total_grid_width = n * square_size
+    total_grid_height = m * square_size
+
+    # 计算图像在总画布中居中所需的偏移量
+    offset_x = (total_grid_width - img_width) // 2
+    offset_y = (total_grid_height - img_height) // 2
+
     # 如果输出目录不存在，则创建它
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -39,25 +47,32 @@ def split_image(image_path, m, n, output_dir):
 
     for i in range(m):
         for j in range(n):
-            # 定义从原图中裁剪的区域
-            # 使用四舍五入而不是截断可以更均匀地分配像素
-            left = round(j * sub_img_width)
-            top = round(i * sub_img_height)
-            right = round((j + 1) * sub_img_width)
-            bottom = round((i + 1) * sub_img_height)
-            
-            # 确保裁剪区域不会超出原图边界
-            right = min(right, img_width)
-            bottom = min(bottom, img_height)
-
-            # 裁剪子图片
-            sub_image = image.crop((left, top, right, bottom))
-            
             # 创建一个新的带有透明背景的正方形图片
             square_img = Image.new("RGBA", (square_size, square_size), (0, 0, 0, 0))
 
-            # 将裁剪出的子图片粘贴到透明正方形的左上角
-            square_img.paste(sub_image, (0, 0))
+            # 计算当前方块在总画布中的位置
+            # 并以此反推需要从原图中裁剪的区域
+            source_crop_left = j * square_size - offset_x
+            source_crop_top = i * square_size - offset_y
+            source_crop_right = source_crop_left + square_size
+            source_crop_bottom = source_crop_top + square_size
+
+            # 确定实际裁剪区域与原图的交集
+            actual_crop_left = max(0, source_crop_left)
+            actual_crop_top = max(0, source_crop_top)
+            actual_crop_right = min(img_width, source_crop_right)
+            actual_crop_bottom = min(img_height, source_crop_bottom)
+            
+            # 如果交集有效，则进行裁剪和粘贴
+            if actual_crop_left < actual_crop_right and actual_crop_top < actual_crop_bottom:
+                # 裁剪子图片
+                sub_image = image.crop((actual_crop_left, actual_crop_top, actual_crop_right, actual_crop_bottom))
+
+                # 计算粘贴到当前方块内的位置
+                paste_x = actual_crop_left - source_crop_left
+                paste_y = actual_crop_top - source_crop_top
+                
+                square_img.paste(sub_image, (paste_x, paste_y))
 
             # 保存最终的正方形图片
             output_filename = os.path.join(output_dir, f"square_{i}_{j}.png")
