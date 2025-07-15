@@ -1,42 +1,100 @@
 import os
+import math
 from PIL import Image
 
-def split_image_to_squares(image_path, m, n, output_dir):
-    # 打开图片，确保为RGBA模式
-    img = Image.open(image_path).convert('RGBA')
-    width, height = img.size
+def split_image(image_path, m, n, output_dir):
+    """
+    将一张图片分割成 m x n 的图块。
 
-    # 创建正方形画布，边长为max(width, height)
-    canvas_size = max(width, height)
-    canvas = Image.new('RGBA', (canvas_size, canvas_size), (0, 0, 0, 0))
-    # 计算居中粘贴位置
-    paste_x = (canvas_size - width) // 2
-    paste_y = (canvas_size - height) // 2
-    canvas.paste(img, (paste_x, paste_y))
+    每个图块都会被保存为一个正方形的PNG图片。原始图片内容不会被拉伸。
+    如果图块的区域小于正方形，剩余部分将用透明背景填充。
 
-    # 分割参数
-    cell_size = canvas_size // max(m, n)
+    Args:
+        image_path (str): 输入图片的路径。
+        m (int): 要将图片分割成的行数。
+        n (int): 要将图片分割成的列数。
+        output_dir (str): 保存输出图片的目录。
+    """
+    try:
+        image = Image.open(image_path)
+    except FileNotFoundError:
+        print(f"错误：在路径 {image_path} 未找到图片文件。")
+        return
 
-    # 创建输出文件夹
-    os.makedirs(output_dir, exist_ok=True)
+    # 将图片转换为RGBA模式，以确保它有alpha通道用于透明度
+    image = image.convert("RGBA")
+    img_width, img_height = image.size
 
-    for row in range(m):
-        for col in range(n):
-            left = col * cell_size
-            upper = row * cell_size
-            right = left + cell_size
-            lower = upper + cell_size
-            crop = canvas.crop((left, upper, right, lower))
-            out_path = os.path.join(output_dir, f'square_{row}_{col}.png')
-            crop.save(out_path)
-    print(f'已保存到 {output_dir}')
+    # 计算网格中每个子图片的理论尺寸
+    sub_img_width = img_width / n
+    sub_img_height = img_height / m
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description='将图片分割为m行n列的正方形小图，空白区域透明填充')
-    parser.add_argument('image', help='输入图片路径')
-    parser.add_argument('m', type=int, help='行数')
-    parser.add_argument('n', type=int, help='列数')
-    parser.add_argument('--output', default='output', help='输出文件夹')
-    args = parser.parse_args()
-    split_image_to_squares(args.image, args.m, args.n, args.output)
+    # 输出的正方形边长取子图片尺寸中较大者的向上取整
+    square_size = math.ceil(max(sub_img_width, sub_img_height))
+
+    # 如果输出目录不存在，则创建它
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"已创建输出文件夹: {output_dir}")
+
+    for i in range(m):
+        for j in range(n):
+            # 定义从原图中裁剪的区域
+            # 使用四舍五入而不是截断可以更均匀地分配像素
+            left = round(j * sub_img_width)
+            top = round(i * sub_img_height)
+            right = round((j + 1) * sub_img_width)
+            bottom = round((i + 1) * sub_img_height)
+            
+            # 确保裁剪区域不会超出原图边界
+            right = min(right, img_width)
+            bottom = min(bottom, img_height)
+
+            # 裁剪子图片
+            sub_image = image.crop((left, top, right, bottom))
+            
+            # 创建一个新的带有透明背景的正方形图片
+            square_img = Image.new("RGBA", (square_size, square_size), (0, 0, 0, 0))
+
+            # 将裁剪出的子图片粘贴到透明正方形的左上角
+            square_img.paste(sub_image, (0, 0))
+
+            # 保存最终的正方形图片
+            output_filename = os.path.join(output_dir, f"square_{i}_{j}.png")
+            square_img.save(output_filename)
+            print(f"已保存 {output_filename}")
+
+    print("图片分割完成。")
+
+if __name__ == "__main__":
+    # --- 配置 ---
+    # 请将 'test.png' 替换为您的图片文件名
+    INPUT_IMAGE = "test.png" 
+    
+    # m: 您希望将图片分割成的行数
+    ROWS = 3
+    
+    # n: 您希望将图片分割成的列数
+    COLS = 4
+    
+    # 保存分割后图片的文件夹名称
+    OUTPUT_DIR = "result"
+    # ------------
+
+    print("开始处理图片...")
+    print(f"输入图片: {INPUT_IMAGE}")
+    print(f"分割成: {ROWS} 行 x {COLS} 列")
+
+    # 检查Pillow库是否安装
+    try:
+        from PIL import Image
+    except ImportError:
+        print("错误：Pillow 库未安装。")
+        print("请使用 'pip install Pillow' 命令进行安装。")
+        exit()
+
+    if not os.path.exists(INPUT_IMAGE):
+        print(f"错误：输入图片 '{INPUT_IMAGE}' 不存在。")
+        print("请将图片文件放置在脚本相同目录下，或更新 INPUT_IMAGE 变量的路径。")
+    else:
+        split_image(INPUT_IMAGE, ROWS, COLS, OUTPUT_DIR)
