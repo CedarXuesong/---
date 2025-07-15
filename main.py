@@ -83,23 +83,9 @@ def split_image(image_path, m, n, output_dir):
 
 if __name__ == "__main__":
     # --- 配置 ---
-    # 请将 'test.png' 替换为您的图片文件名
-    INPUT_IMAGE = "test.png" 
+    # 获取用户输入
+    INPUT_IMAGE = input("请输入图片文件名 (例如 test.png): ")
     
-    # m: 您希望将图片分割成的行数
-    ROWS = 3
-    
-    # n: 您希望将图片分割成的列数
-    COLS = 4
-    
-    # 保存分割后图片的文件夹名称
-    OUTPUT_DIR = "result"
-    # ------------
-
-    print("开始处理图片...")
-    print(f"输入图片: {INPUT_IMAGE}")
-    print(f"分割成: {ROWS} 行 x {COLS} 列")
-
     # 检查Pillow库是否安装
     try:
         from PIL import Image
@@ -108,8 +94,47 @@ if __name__ == "__main__":
         print("请使用 'pip install Pillow' 命令进行安装。")
         exit()
 
-    if not os.path.exists(INPUT_IMAGE):
+    while not os.path.exists(INPUT_IMAGE):
         print(f"错误：输入图片 '{INPUT_IMAGE}' 不存在。")
-        print("请将图片文件放置在脚本相同目录下，或更新 INPUT_IMAGE 变量的路径。")
-    else:
+        INPUT_IMAGE = input("请重新输入有效的文件名: ")
+
+    while True:
+        try:
+            COLS_str = input("请输入希望将图片分割成的横向正方形数量 (列数 n): ")
+            COLS = int(COLS_str)
+            if COLS > 0:
+                break
+            else:
+                print("错误：列数必须是正整数。")
+        except ValueError:
+            print("错误：请输入一个有效的整数。")
+
+    OUTPUT_DIR = input("请输入保存分割后图片的文件夹名称 (默认为 'result'): ")
+    if not OUTPUT_DIR:
+        OUTPUT_DIR = "result"
+    # ------------
+
+    print("\n开始处理图片...")
+
+    try:
+        # 打开图片以获取其尺寸
+        with Image.open(INPUT_IMAGE) as img:
+            img_width, img_height = img.size
+
+        # 竖向数量（行数 m）自适应
+        # 基于原始图片宽高比和输入的列数来计算行数
+        if img_width > 0:
+            ROWS = round(COLS * img_height / img_width)
+            ROWS = max(1, ROWS) # 确保至少有1行
+        else:
+            ROWS = 1 # 如果图片宽度为0，默认1行
+
+        print(f"输入图片: {INPUT_IMAGE} (尺寸: {img_width}x{img_height})")
+        print(f"指定的列数 (n): {COLS}")
+        print(f"自动计算的行数 (m): {ROWS}")
+        print(f"将分割成: {ROWS} 行 x {COLS} 列")
+        
         split_image(INPUT_IMAGE, ROWS, COLS, OUTPUT_DIR)
+
+    except Exception as e:
+        print(f"处理图片时发生错误: {e}")
